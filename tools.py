@@ -1,0 +1,135 @@
+"""
+Tools for the LangGraph Claude Code clone.
+
+In the raw Anthropic version, tools are JSON schemas + manual dispatch functions.
+In LangChain/LangGraph, tools are Python functions decorated with @tool.
+LangChain automatically generates the JSON schema from the function signature
+and docstring, and LangGraph's ToolNode handles dispatching.
+"""
+
+import glob as glob_module
+import os
+import re
+import subprocess
+
+from langchain_core.tools import tool
+
+
+@tool
+def read_file(path: str) -> str:
+    """Read the contents of a file at the given path. Use this to examine existing code or files."""
+    try:
+        with open(path, "r") as f:
+            return f.read()
+    except Exception as e:
+        return f"Error reading file: {e}"
+
+
+@tool
+def write_file(path: str, content: str) -> str:
+    """Write content to a file at the given path. Creates the file if it doesn't exist, overwrites if it does."""
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "w") as f:
+            f.write(content)
+        return f"Successfully wrote to {path}"
+    except Exception as e:
+        return f"Error writing file: {e}"
+
+
+@tool
+def edit_file(path: str, old_string: str, new_string: str) -> str:
+    """Make a surgical edit to a file by replacing an exact string match.
+    The old_string must appear exactly once in the file (including whitespace and indentation).
+    Use read_file first to see the current contents.
+    Prefer this over write_file when modifying existing files."""
+    try:
+        with open(path, "r") as f:
+            content = f.read()
+
+        count = content.count(old_string)
+        if count == 0:
+            return f"Error: old_string not found in {path}"
+        if count > 1:
+            return f"Error: old_string appears {count} times in {path} — must be unique"
+
+        new_content = content.replace(old_string, new_string, 1)
+        with open(path, "w") as f:
+            f.write(new_content)
+        return f"Successfully edited {path}"
+    except Exception as e:
+        return f"Error editing file: {e}"
+
+
+@tool
+def grep(pattern: str, path: str = ".") -> str:
+    """Search for a regex pattern across files in a directory.
+    Returns matching lines with file paths and line numbers.
+    Use this to find where functions, variables, or patterns are used in the codebase."""
+    try:
+        regex = re.compile(pattern)
+    except re.error as e:
+        return f"Invalid regex: {e}"
+
+    matches = []
+    for root, dirs, files in os.walk(path):
+        dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ("node_modules", "__pycache__", ".venv")]
+        for filename in files:
+            filepath = os.path.join(root, filename)
+            try:
+                with open(filepath, "r", errors="ignore") as f:
+                    for i, line in enumerate(f, 1):
+                        if regex.search(line):
+                            matches.append(f"{filepath}:{i}: {line.rstrip()}")
+            except (OSError, IsADirectoryError):
+                continue
+
+    if not matches:
+        return "No matches found"
+    return "\n".join(matches[:100])
+
+
+@tool
+def glob(pattern: str, path: str = ".") -> str:
+    """Find files matching a glob pattern (e.g. '**/*.py' for all Python files).
+    Returns a list of matching file paths.
+    Use this to discover project structure and find files by name."""
+    full_pattern = os.path.join(path, pattern)
+    matches = glob_module.glob(full_pattern, recursive=True)
+    skip = {".git", ".venv", "node_modules", "__pycache__"}
+    filtered = []
+    for m in matches:
+        parts = m.split(os.sep)
+        if any(p in skip or (p.startswith(".") and p != ".") for p in parts):
+            continue
+        if os.path.isfile(m):
+            filtered.append(os.path.relpath(m, path))
+
+    if not filtered:
+        return "No files found"
+    return "\n".join(sorted(filtered))
+
+
+@tool
+def run_command(command: str) -> str:
+    """Run a shell command and return its output.
+    Use this for tasks like running tests, installing packages, git operations, etc.
+    Prefer grep and glob tools over shell grep/find commands."""
+    try:
+        result = subprocess.run(
+            command, shell=True, capture_output=True, text=True, timeout=30
+        )
+        output = result.stdout
+        if result.stderr:
+            output += "\n" + result.stderr
+        if result.returncode != 0:
+            output += f"\n(exit code: {result.returncode})"
+        return output or "(no output)"
+    except subprocess.TimeoutExpired:
+        return "Error: command timed out after 30 seconds"
+    except Exception as e:
+        return f"Error running command: {e}"
+
+
+# All tools collected in a list — passed to the model and to ToolNode.
+ALL_TOOLS = [read_file, write_file, edit_file, grep, glob, run_command]
