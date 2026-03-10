@@ -1,3 +1,4 @@
+anthropic
 langchain-google-vertexai
 langgraph
 langfuse

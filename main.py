@@ -19,7 +19,7 @@ so you can inspect what happened in the Langfuse dashboard.
 import os
 import sys
 
-from langchain_google_vertexai import ChatVertexAI
+from langchain_google_vertexai.model_garden import ChatAnthropicVertex
 from langgraph.graph import END, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
@@ -50,7 +50,9 @@ def build_graph():
     # Create the model and bind tools to it.
     # bind_tools() tells the model what tools are available — same as passing
     # the tools list in the raw API, but LangChain handles schema generation.
-    model = ChatVertexAI(
+    # ChatAnthropicVertex routes to publishers/anthropic/models/ on Vertex AI.
+    # ChatVertexAI routes to publishers/google/models/ which doesn't have Claude.
+    model = ChatAnthropicVertex(
         model_name=model_name,
         project=project,
         location=region,
