@@ -111,13 +111,14 @@ def main():
     # Conversation history persists across turns, just like the raw version.
     messages = [system_message]
 
-    # Langfuse tracing — uses OpenTelemetry integration.
+    # Langfuse tracing via LangChain callback handler.
     # Set LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, and LANGFUSE_HOST env vars
-    # to enable. Langfuse v4 uses OTEL under the hood, so we initialize it here
-    # and it automatically instruments LangChain/LangGraph calls.
+    # to enable. The callback handler hooks into LangChain's callback system
+    # and sends traces for every LLM call and tool execution to Langfuse.
+    langfuse_handler = None
     if os.environ.get("LANGFUSE_PUBLIC_KEY"):
-        from langfuse import get_client
-        get_client()  # Initializes the Langfuse OTEL instrumentation
+        from langfuse.langchain import CallbackHandler
+        langfuse_handler = CallbackHandler()
         print("(Langfuse tracing enabled)")
 
     print("Claude Code (LangGraph) — type 'quit' to exit")
@@ -144,8 +145,11 @@ def main():
 
         # Invoke the graph. LangGraph runs the agent->tools->agent loop
         # automatically until should_continue returns END.
-        # Langfuse traces this automatically if initialized above.
-        result = app.invoke({"messages": messages})
+        # The Langfuse callback handler traces each step if configured.
+        config = {}
+        if langfuse_handler:
+            config["callbacks"] = [langfuse_handler]
+        result = app.invoke({"messages": messages}, config=config)
 
         # The graph returns the full message list including new messages.
         messages = result["messages"]
