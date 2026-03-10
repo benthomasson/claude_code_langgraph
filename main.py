@@ -145,11 +145,20 @@ def main():
 
         # Invoke the graph. LangGraph runs the agent->tools->agent loop
         # automatically until should_continue returns END.
-        # The Langfuse callback handler traces each step if configured.
-        config = {}
+        # recursion_limit caps the total number of graph steps to prevent
+        # runaway loops (each agent->tools cycle is 2 steps, so 25 allows
+        # about 10 tool rounds plus some headroom).
+        config = {"recursion_limit": 25}
         if langfuse_handler:
             config["callbacks"] = [langfuse_handler]
-        result = app.invoke({"messages": messages}, config=config)
+        try:
+            result = app.invoke({"messages": messages}, config=config)
+        except Exception as e:
+            if "recursion" in str(e).lower():
+                print("\n[stopped: too many tool rounds]")
+                print()
+                continue
+            raise
 
         # The graph returns the full message list including new messages.
         messages = result["messages"]
