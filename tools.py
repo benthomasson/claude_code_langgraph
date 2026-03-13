@@ -131,6 +131,48 @@ def run_command(command: str) -> str:
         return f"Error running command: {e}"
 
 
+@tool
+def lookup_beliefs(query: str, beliefs_file: str = "") -> str:
+    """Search a markdown belief registry for beliefs matching a query.
+    Returns matching beliefs with their status, text, and source.
+    Use this to check what is known about a topic before answering questions.
+    The beliefs_file defaults to the BELIEFS_FILE environment variable."""
+    beliefs_path = beliefs_file or os.environ.get("BELIEFS_FILE", "beliefs.md")
+    try:
+        with open(beliefs_path, "r") as f:
+            content = f.read()
+    except FileNotFoundError:
+        return f"Error: beliefs file not found at {beliefs_path}"
+    except Exception as e:
+        return f"Error reading beliefs file: {e}"
+
+    # Parse beliefs into individual entries
+    beliefs = []
+    current_belief = []
+    for line in content.split("\n"):
+        if line.startswith("### ") and "[" in line and "]" in line:
+            if current_belief:
+                beliefs.append("\n".join(current_belief))
+            current_belief = [line]
+        elif current_belief:
+            current_belief.append(line)
+    if current_belief:
+        beliefs.append("\n".join(current_belief))
+
+    # Search for matching beliefs (case-insensitive)
+    query_lower = query.lower()
+    query_terms = query_lower.split()
+    matches = []
+    for belief in beliefs:
+        belief_lower = belief.lower()
+        if all(term in belief_lower for term in query_terms):
+            matches.append(belief.strip())
+
+    if not matches:
+        return f"No beliefs found matching '{query}'"
+    return f"Found {len(matches)} matching belief(s):\n\n" + "\n\n".join(matches[:20])
+
+
 # --- RMS tools (Reason Maintenance System) ---
 # These wrap rms_lib.api functions as LangGraph tools. The api functions
 # return JSON-serializable dicts, so we just convert to str for the model.
@@ -246,6 +288,7 @@ RMS_TOOLS = [
     rms_nogood, rms_compact,
 ]
 
-# All tools collected in a list — passed to the model and to ToolNode.
-BASE_TOOLS = [read_file, write_file, edit_file, grep, glob, run_command]
-ALL_TOOLS = BASE_TOOLS + (RMS_TOOLS if _RMS_AVAILABLE else [])
+# Tool lists
+CORE_TOOLS = [read_file, write_file, edit_file, grep, glob, run_command]
+EXPERT_TOOLS = [lookup_beliefs]
+ALL_TOOLS = CORE_TOOLS + EXPERT_TOOLS + (RMS_TOOLS if _RMS_AVAILABLE else [])
