@@ -3,3 +3,4 @@ langchain
 langchain-google-vertexai
 langgraph
 langfuse
+rms @ git+https://github.com/benthomasson/rms

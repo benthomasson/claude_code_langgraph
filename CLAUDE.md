@@ -23,6 +23,7 @@ LangGraph + Langfuse version of the Claude Code clone. Same functionality as `..
 - `langchain-google-vertexai` — ChatAnthropicVertex for Claude on Vertex
 - `langgraph` — Graph-based agent framework
 - `langfuse` — Observability/tracing via callback handler
+- `rms` — Reason Maintenance System (optional). If installed, 12 rms tools are added automatically: rms_status, rms_add, rms_retract, rms_assert, rms_explain, rms_show, rms_search, rms_trace, rms_challenge, rms_defend, rms_nogood, rms_compact. The agent can track beliefs with automatic retraction cascades.
 
 ## Environment variables
 
