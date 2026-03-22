@@ -239,9 +239,14 @@ def rms_show(node_id: str, db_path: str = "rms.db") -> str:
 
 @tool
 def rms_search(query: str, db_path: str = "rms.db") -> str:
-    """Search beliefs by text or ID (case-insensitive substring match)."""
-    result = rms_api.search(query, db_path=db_path)
-    return json.dumps(result, indent=2)
+    """Search beliefs using full-text search with neighbor expansion. Returns matched nodes and related nodes from the dependency graph."""
+    return rms_api.search(query, db_path=db_path)
+
+
+@tool
+def rms_lookup(query: str, db_path: str = "rms.db") -> str:
+    """Simple keyword search over beliefs in the RMS network. Returns matching beliefs as plain text blocks. Use this to check what is known about a topic."""
+    return rms_api.lookup(query, db_path=db_path)
 
 
 @tool
@@ -284,7 +289,7 @@ def rms_compact(budget: int = 500, db_path: str = "rms.db") -> str:
 
 RMS_TOOLS = [
     rms_status, rms_add, rms_retract, rms_assert, rms_explain,
-    rms_show, rms_search, rms_trace, rms_challenge, rms_defend,
+    rms_show, rms_search, rms_lookup, rms_trace, rms_challenge, rms_defend,
     rms_nogood, rms_compact,
 ]
 
