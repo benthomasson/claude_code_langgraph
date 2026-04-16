@@ -288,9 +288,9 @@ def reasons_compact(budget: int = 500, db_path: str = "rms.db") -> str:
 
 
 REASONS_TOOLS = [
-    rms_status, rms_add, rms_retract, rms_assert, rms_explain,
-    rms_show, rms_search, rms_lookup, rms_trace, rms_challenge, rms_defend,
-    rms_nogood, rms_compact,
+    reasons_status, reasons_add, reasons_retract, reasons_assert, reasons_explain,
+    reasons_show, reasons_search, reasons_lookup, reasons_trace, reasons_challenge,
+    reasons_defend, reasons_nogood, reasons_compact,
 ]
 
 # Tool lists
