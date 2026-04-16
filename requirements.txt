@@ -1,6 +1,7 @@
 anthropic
 langchain
 langchain-google-vertexai
+langchain-ollama
 langgraph
 langfuse
 reasons @ git+https://github.com/benthomasson/rms

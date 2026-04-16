@@ -27,7 +27,6 @@ import os
 import sys
 import time
 
-from langchain_google_vertexai.model_garden import ChatAnthropicVertex
 from langgraph.graph import END, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
@@ -89,23 +88,43 @@ def build_graph(tools=None):
     - After "agent", if no tool calls -> go to END
     - After "tools", always go back to "agent" (so it can see the results)
     """
-    project = os.environ.get("GOOGLE_CLOUD_PROJECT")
-    region = os.environ.get("GOOGLE_CLOUD_REGION", "us-east5")
-    model_name = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
-
-    if not project:
-        print("Error: set GOOGLE_CLOUD_PROJECT environment variable")
-        sys.exit(1)
+    provider = os.environ.get("LLM_PROVIDER", "vertex").lower()
+    model_name = os.environ.get("LLM_MODEL")
+    if not model_name and provider == "vertex":
+        model_name = os.environ.get("ANTHROPIC_MODEL")
 
     if tools is None:
         tools = ALL_TOOLS
 
-    # Create the model and bind tools to it.
-    model = ChatAnthropicVertex(
-        model_name=model_name,
-        project=project,
-        location=region,
-    ).bind_tools(tools)
+    # Create the model based on provider.
+    if provider == "ollama":
+        from langchain_ollama import ChatOllama
+        if not model_name:
+            model_name = "qwen2.5-coder:14b"
+        base_url = os.environ.get("OLLAMA_HOST") or os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+        model = ChatOllama(
+            model=model_name,
+            base_url=base_url,
+        ).bind_tools(tools)
+    elif provider == "vertex":
+        from langchain_google_vertexai.model_garden import ChatAnthropicVertex
+        if not model_name:
+            model_name = "claude-sonnet-4-20250514"
+        project = os.environ.get("GOOGLE_CLOUD_PROJECT")
+        region = os.environ.get("GOOGLE_CLOUD_REGION", "us-east5")
+        if not project:
+            print("Error: set GOOGLE_CLOUD_PROJECT environment variable")
+            sys.exit(1)
+        model = ChatAnthropicVertex(
+            model_name=model_name,
+            project=project,
+            location=region,
+        ).bind_tools(tools)
+    else:
+        print(f"Error: unknown LLM_PROVIDER '{provider}' (use 'vertex' or 'ollama')")
+        sys.exit(1)
+
+    print(f"Using {provider} model: {model_name}")
 
     # --- Define the graph nodes ---
 
