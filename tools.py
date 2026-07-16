@@ -202,14 +202,14 @@ def lookup_beliefs(query: str, beliefs_file: str = "") -> str:
     except Exception as e:
         return f"Error reading beliefs file: {e}"
 
-    # Parse beliefs into individual entries
+    # Parse beliefs into individual entries, filtering OUT beliefs
     beliefs = []
     current_belief = []
     for line in content.split("\n"):
         if line.startswith("### ") and "[" in line and "]" in line:
             if current_belief:
                 beliefs.append("\n".join(current_belief))
-            current_belief = [line]
+            current_belief = [line] if "[OUT]" not in line else []
         elif current_belief:
             current_belief.append(line)
     if current_belief:

@@ -124,10 +124,10 @@ class TestLookupBeliefsTool:
         beliefs_file = tmp_path / "beliefs.md"
         beliefs_file.write_text(SAMPLE_BELIEFS)
         result = lookup_beliefs.invoke(
-            {"query": "nogood detection",
+            {"query": "federation multi-agent",
              "beliefs_file": str(beliefs_file)}
         )
-        assert "nogood-detection" in result
+        assert "federation-supports-multi-agent" in result
 
     def test_no_match(self, tmp_path):
         beliefs_file = tmp_path / "beliefs.md"
@@ -137,6 +137,25 @@ class TestLookupBeliefsTool:
              "beliefs_file": str(beliefs_file)}
         )
         assert "No beliefs found" in result
+
+    def test_out_beliefs_filtered(self, tmp_path):
+        beliefs_file = tmp_path / "beliefs.md"
+        beliefs_file.write_text(SAMPLE_BELIEFS)
+        result = lookup_beliefs.invoke(
+            {"query": "nogood detection",
+             "beliefs_file": str(beliefs_file)}
+        )
+        assert "No beliefs found" in result
+
+    def test_in_beliefs_not_filtered(self, tmp_path):
+        beliefs_file = tmp_path / "beliefs.md"
+        beliefs_file.write_text(SAMPLE_BELIEFS)
+        result = lookup_beliefs.invoke(
+            {"query": "retraction cascade",
+             "beliefs_file": str(beliefs_file)}
+        )
+        assert "retraction-cascade-propagates" in result
+        assert "[IN]" in result
 
     def test_file_not_found(self):
         result = lookup_beliefs.invoke(
