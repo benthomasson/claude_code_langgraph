@@ -11,6 +11,7 @@ import glob as glob_module
 import os
 import re
 import subprocess
+from itertools import combinations
 
 from langchain_core.tools import tool
 
@@ -131,6 +132,61 @@ def run_command(command: str) -> str:
         return f"Error running command: {e}"
 
 
+_STOP_WORDS = frozenset({
+    "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "could",
+    "should", "may", "might", "shall", "can", "need", "must",
+    "in", "on", "at", "to", "for", "of", "with", "by", "from", "as",
+    "into", "through", "during", "before", "after", "above", "below",
+    "between", "under", "over", "about", "against", "along", "among",
+    "and", "but", "or", "nor", "not", "so", "yet", "both", "either",
+    "neither", "each", "every", "all", "any", "few", "more", "most",
+    "other", "some", "such", "no", "only", "own", "same", "than",
+    "too", "very", "just", "also", "now", "how", "what", "when", "where",
+    "which", "who", "whom", "why", "this", "that", "these", "those",
+    "it", "its", "he", "she", "they", "them", "his", "her", "their",
+    "we", "you", "your", "my", "our", "me", "us", "him",
+    "if", "then", "else", "while", "until", "unless",
+    "there", "here", "up", "out", "off",
+    "specific", "specifically", "particular", "particularly",
+    "included", "including", "within",
+})
+
+
+def _filter_query_terms(query: str) -> list[str]:
+    raw_terms = re.findall(r'\w+', query)
+    terms = [t for t in raw_terms if t.lower() not in _STOP_WORDS and len(t) > 1]
+    if not terms:
+        terms = [t for t in raw_terms if len(t) > 1]
+    return [t.lower() for t in terms]
+
+
+def _relaxed_substring_search(beliefs: list[str], terms: list[str]) -> list[str]:
+    if not terms:
+        return []
+
+    def _match(terms_subset):
+        return [b.strip() for b in beliefs
+                if all(t in b.lower() for t in terms_subset)]
+
+    results = _match(terms)
+    if results or len(terms) <= 2:
+        return results
+
+    _MAX_RELAXATION = 50
+    min_terms = max(1, len(terms) // 2)
+    budget = _MAX_RELAXATION
+    for n in range(len(terms) - 1, min_terms - 1, -1):
+        for combo in combinations(terms, n):
+            budget -= 1
+            if budget < 0:
+                return results
+            results = _match(list(combo))
+            if results:
+                return results
+    return results
+
+
 @tool
 def lookup_beliefs(query: str, beliefs_file: str = "") -> str:
     """Search a markdown belief registry for beliefs matching a query.
@@ -159,14 +215,9 @@ def lookup_beliefs(query: str, beliefs_file: str = "") -> str:
     if current_belief:
         beliefs.append("\n".join(current_belief))
 
-    # Search for matching beliefs (case-insensitive)
-    query_lower = query.lower()
-    query_terms = query_lower.split()
-    matches = []
-    for belief in beliefs:
-        belief_lower = belief.lower()
-        if all(term in belief_lower for term in query_terms):
-            matches.append(belief.strip())
+    # Search with stop-word filtering and progressive relaxation
+    query_terms = _filter_query_terms(query)
+    matches = _relaxed_substring_search(beliefs, query_terms)
 
     if not matches:
         return f"No beliefs found matching '{query}'"
